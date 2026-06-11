@@ -11,6 +11,7 @@ import { Feather } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import { FAKE_MEDIA } from "@/data/fakeData";
 import { PlayerOverlay } from "@/components/PlayerOverlay";
+import { useTVRemote } from "@/hooks/useTVRemote";
 
 export default function PlayerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,22 +19,31 @@ export default function PlayerScreen() {
   const item = FAKE_MEDIA.find((m) => m.id === id) ?? FAKE_MEDIA[0];
 
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const [playing, setPlaying] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showOverlay = useCallback(() => {
     setOverlayVisible(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      setOverlayVisible(false);
-    }, 4000);
+    hideTimer.current = setTimeout(() => setOverlayVisible(false), 4000);
   }, []);
 
   useEffect(() => {
     showOverlay();
-    return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-    };
+    return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
   }, []);
+
+  // D-pad / remote control: any directional key shows overlay; select toggles play/pause
+  useTVRemote(useCallback((evt) => {
+    if (evt === "select" || evt === "playPause") {
+      setPlaying((p) => !p);
+      showOverlay();
+    } else if (evt === "back") {
+      router.back();
+    } else {
+      showOverlay();
+    }
+  }, [showOverlay]));
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -44,13 +54,20 @@ export default function PlayerScreen() {
       <Pressable
         style={[styles.backBtn, { top: topPad + 8 }]}
         onPress={() => router.back()}
+        isTVSelectable
       >
-        <Feather name="arrow-left" size={20} color={overlayVisible ? colors.foreground : "transparent"} />
+        <Feather
+          name="arrow-left"
+          size={20}
+          color={overlayVisible ? colors.foreground : "transparent"}
+        />
       </Pressable>
 
       <PlayerOverlay
         title={item.title}
         visible={overlayVisible}
+        playing={playing}
+        onTogglePlay={() => { setPlaying((p) => !p); showOverlay(); }}
         onClose={() => setOverlayVisible(false)}
       />
     </Pressable>

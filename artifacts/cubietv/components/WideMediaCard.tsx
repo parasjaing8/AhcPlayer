@@ -13,12 +13,13 @@ import type { MediaItem } from "@/data/fakeData";
 
 interface WideMediaCardProps {
   item: MediaItem;
+  preferFocus?: boolean;
 }
 
 const CARD_W = 200;
 const CARD_H = 113;
 
-export function WideMediaCard({ item }: WideMediaCardProps) {
+export function WideMediaCard({ item, preferFocus = false }: WideMediaCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const borderOpacity = useRef(new Animated.Value(0)).current;
 
@@ -45,6 +46,8 @@ export function WideMediaCard({ item }: WideMediaCardProps) {
       onPress={() => router.push(`/detail/${item.id}`)}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
+      isTVSelectable
+      hasTVPreferredFocus={preferFocus}
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
         <Animated.View

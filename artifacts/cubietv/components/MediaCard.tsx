@@ -7,18 +7,22 @@ import {
   Text,
   View,
 } from "react-native";
+
+// On TV, isTVSelectable makes the element focusable via D-pad.
+// hasTVPreferredFocus sets initial focus when screen mounts.
 import { router } from "expo-router";
 import colors from "@/constants/colors";
 import type { MediaItem } from "@/data/fakeData";
 
 interface MediaCardProps {
   item: MediaItem;
+  preferFocus?: boolean;
 }
 
 const CARD_WIDTH = 130;
 const CARD_HEIGHT = 195;
 
-export function MediaCard({ item }: MediaCardProps) {
+export function MediaCard({ item, preferFocus = false }: MediaCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const borderOpacity = useRef(new Animated.Value(0)).current;
 
@@ -43,6 +47,8 @@ export function MediaCard({ item }: MediaCardProps) {
       onPress={() => router.push(`/detail/${item.id}`)}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
+      isTVSelectable
+      hasTVPreferredFocus={preferFocus}
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
         <Animated.View

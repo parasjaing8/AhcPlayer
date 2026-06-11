@@ -22,8 +22,10 @@ export function SectionRow({ title, data, wide = false }: SectionRowProps) {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         scrollEnabled={data.length > 0}
-        renderItem={({ item }) =>
-          wide ? <WideMediaCard item={item} /> : <MediaCard item={item} />
+        renderItem={({ item, index }) =>
+          wide
+            ? <WideMediaCard item={item} preferFocus={index === 0} />
+            : <MediaCard item={item} preferFocus={index === 0} />
         }
       />
     </View>

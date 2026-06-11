@@ -13,6 +13,8 @@ import colors from "@/constants/colors";
 interface PlayerOverlayProps {
   title: string;
   visible: boolean;
+  playing?: boolean;
+  onTogglePlay?: () => void;
   onClose: () => void;
 }
 
@@ -27,9 +29,9 @@ function formatTime(secs: number): string {
 
 const TOTAL = 7120; // 1h 58m 40s
 
-export function PlayerOverlay({ title, visible, onClose }: PlayerOverlayProps) {
-  const [playing, setPlaying] = useState(true);
-  const [position, setPosition] = useState(2533); // 42:13
+export function PlayerOverlay({ title, visible, playing: playingProp, onTogglePlay, onClose }: PlayerOverlayProps) {
+  const [playing, setPlaying] = useState(playingProp ?? true);
+  const [position, setPosition] = useState(2533);
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -40,6 +42,11 @@ export function PlayerOverlay({ title, visible, onClose }: PlayerOverlayProps) {
     }).start();
   }, [visible]);
 
+  // Sync play state from parent (TV remote fires into PlayerScreen, not this overlay)
+  useEffect(() => {
+    if (playingProp !== undefined) setPlaying(playingProp);
+  }, [playingProp]);
+
   const seek = (delta: number) => {
     setPosition((p) => Math.max(0, Math.min(TOTAL, p + delta)));
   };
@@ -48,8 +55,7 @@ export function PlayerOverlay({ title, visible, onClose }: PlayerOverlayProps) {
 
   return (
     <Animated.View
-      style={[styles.overlay, { opacity }]}
-      pointerEvents={visible ? "box-none" : "none"}
+      style={[styles.overlay, { opacity, pointerEvents: visible ? "box-none" : "none" }]}
     >
       <View style={styles.topBar}>
         <Text style={styles.titleText}>{title}</Text>
@@ -76,7 +82,9 @@ export function PlayerOverlay({ title, visible, onClose }: PlayerOverlayProps) {
 
         <Pressable
           style={styles.playPauseBtn}
-          onPress={() => setPlaying((p) => !p)}
+          isTVSelectable
+          hasTVPreferredFocus
+          onPress={() => { setPlaying((p) => !p); onTogglePlay?.(); }}
         >
           <Feather
             name={playing ? "pause" : "play"}
