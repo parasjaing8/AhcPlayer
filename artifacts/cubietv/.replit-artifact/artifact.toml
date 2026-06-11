@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "CubieTV"
+version = "1.0.0"
+id = "artifacts/cubietv"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 23950
+
+[services.development]
+run = "pnpm --filter @workspace/cubietv run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/cubietv", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/cubietv", "run", "serve" ]
+
+[services.env]
+PORT = "23950"
+BASE_PATH = "/"
