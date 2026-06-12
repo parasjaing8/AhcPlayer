@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import colors from "@/constants/colors";
+import { PlayerSettingsOverlay, type SettingsTab } from "./PlayerSettingsOverlay";
 
 interface PlayerOverlayProps {
   title: string;
@@ -32,6 +33,8 @@ const TOTAL = 7120; // 1h 58m 40s
 export function PlayerOverlay({ title, visible, playing: playingProp, onTogglePlay, onClose }: PlayerOverlayProps) {
   const [playing, setPlaying] = useState(playingProp ?? true);
   const [position, setPosition] = useState(2533);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("audio");
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -100,16 +103,30 @@ export function PlayerOverlay({ title, visible, playing: playingProp, onTogglePl
 
         <View style={styles.spacer} />
 
-        <Pressable style={styles.trackBtn}>
+        <Pressable
+          style={styles.trackBtn}
+          onPress={() => { setSettingsTab("audio"); setSettingsVisible(true); }}
+          isTVSelectable
+        >
           <Feather name="volume-2" size={16} color={colors.muted} />
           <Text style={styles.trackBtnText}>Audio</Text>
         </Pressable>
 
-        <Pressable style={styles.trackBtn}>
+        <Pressable
+          style={styles.trackBtn}
+          onPress={() => { setSettingsTab("subs"); setSettingsVisible(true); }}
+          isTVSelectable
+        >
           <Feather name="type" size={16} color={colors.muted} />
           <Text style={styles.trackBtnText}>Subs</Text>
         </Pressable>
       </View>
+
+      <PlayerSettingsOverlay
+        visible={settingsVisible}
+        initialTab={settingsTab}
+        onClose={() => setSettingsVisible(false)}
+      />
     </Animated.View>
   );
 }

@@ -52,7 +52,7 @@ export function TVButton({
     variant === "ghost" ? "rgba(255,255,255,0.35)" : "transparent";
 
   return (
-    <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+    <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} isTVSelectable>
       <Animated.View
         style={[
           styles.btn,

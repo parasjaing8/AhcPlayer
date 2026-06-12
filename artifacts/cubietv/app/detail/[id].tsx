@@ -37,6 +37,7 @@ export default function DetailScreen() {
       <Pressable
         style={[styles.backBtn, { top: topPad + 8 }]}
         onPress={() => router.back()}
+        isTVSelectable
       >
         <Feather name="arrow-left" size={20} color={colors.foreground} />
       </Pressable>
@@ -68,6 +69,8 @@ export default function DetailScreen() {
             <Pressable
               style={styles.playBtn}
               onPress={() => router.push(`/player/${item.id}`)}
+              isTVSelectable
+              hasTVPreferredFocus
             >
               <Feather name="play" size={16} color="#000" />
               <Text style={styles.playBtnText}>Play</Text>
