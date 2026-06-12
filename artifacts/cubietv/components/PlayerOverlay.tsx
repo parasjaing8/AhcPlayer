@@ -17,6 +17,13 @@ interface PlayerOverlayProps {
   playing?: boolean;
   onTogglePlay?: () => void;
   onClose: () => void;
+  /** Live position from VLC in ms. If omitted, internal stub state is used. */
+  position?: number;
+  /** Live duration from VLC in ms. If omitted, hardcoded stub total is used. */
+  duration?: number;
+  /** Called when user requests a seek; delta is in seconds (+/-). */
+  onSeek?: (deltaSec: number) => void;
+  buffering?: boolean;
 }
 
 function formatTime(secs: number): string {
@@ -30,12 +37,20 @@ function formatTime(secs: number): string {
 
 const TOTAL = 7120; // 1h 58m 40s
 
-export function PlayerOverlay({ title, visible, playing: playingProp, onTogglePlay, onClose }: PlayerOverlayProps) {
+export function PlayerOverlay({
+  title, visible, playing: playingProp, onTogglePlay, onClose,
+  position: positionMs, duration: durationMs, onSeek, buffering,
+}: PlayerOverlayProps) {
   const [playing, setPlaying] = useState(playingProp ?? true);
-  const [position, setPosition] = useState(2533);
+  const [positionStub, setPositionStub] = useState(2533);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("audio");
   const opacity = useRef(new Animated.Value(0)).current;
+
+  // Use live VLC values when available, else fall back to stub
+  const positionSec = positionMs != null ? Math.floor(positionMs / 1000) : positionStub;
+  const totalSec = durationMs != null && durationMs > 0 ? Math.floor(durationMs / 1000) : TOTAL;
+  const pct = totalSec > 0 ? positionSec / totalSec : 0;
 
   useEffect(() => {
     Animated.timing(opacity, {
@@ -45,16 +60,17 @@ export function PlayerOverlay({ title, visible, playing: playingProp, onTogglePl
     }).start();
   }, [visible]);
 
-  // Sync play state from parent (TV remote fires into PlayerScreen, not this overlay)
   useEffect(() => {
     if (playingProp !== undefined) setPlaying(playingProp);
   }, [playingProp]);
 
   const seek = (delta: number) => {
-    setPosition((p) => Math.max(0, Math.min(TOTAL, p + delta)));
+    if (onSeek) {
+      onSeek(delta);
+    } else {
+      setPositionStub((p) => Math.max(0, Math.min(TOTAL, p + delta)));
+    }
   };
-
-  const pct = position / TOTAL;
 
   return (
     <Animated.View
@@ -73,7 +89,7 @@ export function PlayerOverlay({ title, visible, playing: playingProp, onTogglePl
           <View style={[styles.thumb, { left: `${pct * 100}%` as any }]} />
         </View>
         <Text style={styles.timeText}>
-          {formatTime(position)} / {formatTime(TOTAL)}
+          {formatTime(positionSec)} / {formatTime(totalSec)}
         </Text>
       </View>
 
