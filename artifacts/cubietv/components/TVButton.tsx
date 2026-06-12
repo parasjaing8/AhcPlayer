@@ -16,47 +16,42 @@ interface TVButtonProps {
   style?: ViewStyle;
 }
 
-export function TVButton({
-  label,
-  onPress,
-  variant = "primary",
-  icon,
-  style,
-}: TVButtonProps) {
+export function TVButton({ label, onPress, variant = "primary", icon, style }: TVButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
+  const borderOpacity = useRef(new Animated.Value(0)).current;
 
-  const onPressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.94,
-      useNativeDriver: true,
-      speed: 40,
-    }).start();
-  };
-
-  const onPressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 40,
-    }).start();
+  const highlight = (on: boolean) => {
+    Animated.spring(scale, { toValue: on ? 1.06 : 1, useNativeDriver: false, speed: 40 }).start();
+    Animated.timing(borderOpacity, { toValue: on ? 1 : 0, duration: 120, useNativeDriver: false }).start();
   };
 
   const bg =
-    variant === "primary"
-      ? colors.primary
-      : variant === "secondary"
-        ? colors.surfaceVariant
-        : "transparent";
+    variant === "primary" ? colors.primary :
+    variant === "secondary" ? colors.surfaceVariant :
+    "transparent";
 
-  const borderColor =
-    variant === "ghost" ? "rgba(255,255,255,0.35)" : "transparent";
+  const baseBorderColor = variant === "ghost" ? "rgba(255,255,255,0.35)" : "transparent";
 
   return (
-    <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} isTVSelectable>
+    <Pressable
+      onPress={onPress}
+      onFocus={() => highlight(true)}
+      onBlur={() => highlight(false)}
+      onPressIn={() => highlight(true)}
+      onPressOut={() => highlight(false)}
+      isTVSelectable
+    >
       <Animated.View
         style={[
           styles.btn,
-          { backgroundColor: bg, borderColor, transform: [{ scale }] },
+          {
+            backgroundColor: bg,
+            borderColor: borderOpacity.interpolate({
+              inputRange: [0, 1],
+              outputRange: [baseBorderColor, colors.focusHighlight],
+            }),
+            transform: [{ scale }],
+          },
           style,
         ]}
       >
@@ -77,15 +72,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 11,
     borderRadius: 6,
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
-  label: {
-    color: colors.foreground,
-    fontSize: 15,
-    fontWeight: "600",
-    letterSpacing: 0.3,
-  },
-  labelGhost: {
-    color: "rgba(255,255,255,0.85)",
-  },
+  label: { color: colors.foreground, fontSize: 15, fontWeight: "600", letterSpacing: 0.3 },
+  labelGhost: { color: "rgba(255,255,255,0.85)" },
 });

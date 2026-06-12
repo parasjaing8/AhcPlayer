@@ -102,7 +102,7 @@ export function PlayerOverlay({
         <Pressable
           style={styles.playPauseBtn}
           isTVSelectable
-          hasTVPreferredFocus
+          hasTVPreferredFocus={visible}
           onPress={() => { setPlaying((p) => !p); onTogglePlay?.(); }}
         >
           <Feather

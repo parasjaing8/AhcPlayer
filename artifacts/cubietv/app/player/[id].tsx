@@ -17,7 +17,7 @@ import { useTVRemote } from "@/hooks/useTVRemote";
 // VLC is Android-only native module — guard against web/iOS build errors
 let VLCPlayer: any = null;
 if (Platform.OS === "android") {
-  VLCPlayer = require("react-native-vlc-media-player").default;
+  VLCPlayer = require("react-native-vlc-media-player").VLCPlayer;
 }
 
 export default function PlayerScreen() {
@@ -28,8 +28,10 @@ export default function PlayerScreen() {
   }>();
   const insets = useSafeAreaInsets();
 
-  const streamUrl = urlParam ? decodeURIComponent(urlParam) : null;
-  const item = streamUrl ? null : (FAKE_MEDIA.find((m) => m.id === id) ?? FAKE_MEDIA[0]);
+  const item = FAKE_MEDIA.find((m) => m.id === id) ?? null;
+  const streamUrl = urlParam
+    ? decodeURIComponent(urlParam)
+    : item?.videoUrl ?? null;
   const mediaTitle = titleParam ?? item?.title ?? "Playing";
 
   const [overlayVisible, setOverlayVisible] = useState(true);
@@ -74,7 +76,7 @@ export default function PlayerScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   return (
-    <Pressable style={styles.root} onPress={showOverlay}>
+    <Pressable style={styles.root} onPress={showOverlay} isTVSelectable hasTVPreferredFocus={!overlayVisible}>
       {/* Video surface */}
       {VLCPlayer && streamUrl ? (
         <VLCPlayer
@@ -92,7 +94,7 @@ export default function PlayerScreen() {
             setPositionMs(currentTime);
             if (duration > 0) setDurationMs(duration);
           }}
-          onBuffering={() => setBuffering(true)}
+          onBuffering={({ bufferRate }: { bufferRate: number }) => setBuffering(bufferRate < 100)}
           onPlaying={() => setBuffering(false)}
           onPaused={() => setBuffering(false)}
           onEnd={() => router.back()}

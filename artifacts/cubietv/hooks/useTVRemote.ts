@@ -1,21 +1,11 @@
 import { useEffect } from "react";
-import { HWKeyEvent, TVEventHandler } from "react-native";
+import { BackHandler } from "react-native";
 
 type TVRemoteEvent = "select" | "playPause" | "left" | "right" | "up" | "down" | "back";
 
-const KEY_MAP: Record<string, TVRemoteEvent> = {
-  select: "select",
-  playPause: "playPause",
-  longSelect: "playPause",
-  left: "left",
-  right: "right",
-  up: "up",
-  down: "down",
-  back: "back",
-};
-
-// Handles Fire TV / Android TV remote D-pad and media key events.
-// Only active when `enabled` is true — disable when a modal/overlay captures input.
+// On Android TV / Fire TV, D-pad routing happens through the React Native focus system.
+// This hook only handles the hardware back button — D-pad OK/select goes to the
+// focused Pressable via onPress automatically.
 export function useTVRemote(
   handler: (event: TVRemoteEvent) => void,
   enabled = true
@@ -23,14 +13,11 @@ export function useTVRemote(
   useEffect(() => {
     if (!enabled) return;
 
-    const tvEventHandler = new TVEventHandler();
-    tvEventHandler.enable(null, (_cmp: unknown, evt: HWKeyEvent) => {
-      const mapped = KEY_MAP[evt.eventType];
-      if (mapped) handler(mapped);
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      handler("back");
+      return true; // prevent default back navigation
     });
 
-    return () => {
-      tvEventHandler.disable();
-    };
+    return () => sub.remove();
   }, [handler, enabled]);
 }

@@ -13,7 +13,12 @@ export interface MediaItem {
   progressPct?: number;
   rating: string;
   episodeInfo?: string;
+  videoUrl?: string;
+  posterUrl?: string;
 }
+
+// TMDB poster CDN base — w342 size
+const P = "https://image.tmdb.org/t/p/w342";
 
 export const FAKE_MEDIA: MediaItem[] = [
   {
@@ -28,6 +33,8 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#0d1b6e",
     type: "MOVIE",
     rating: "PG-13",
+    videoUrl: "http://192.168.0.98:8080/The_Shadow%27s_Edge_2025_1080p_WEBRip_H265_10Bit_HQ_DDP_5_1_6C.mkv",
+    posterUrl: `${P}/gEU2QniE6E77NI6lCU6MxlNBvIe.jpg`, // Interstellar
   },
   {
     id: "2",
@@ -41,6 +48,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#38006b",
     type: "MOVIE",
     rating: "R",
+    posterUrl: `${P}/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg`, // The Imitation Game
   },
   {
     id: "3",
@@ -54,6 +62,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#7f0000",
     type: "MOVIE",
     rating: "R",
+    posterUrl: `${P}/rSPw7tgCH9c6NqICZef4kZjFOQ5.jpg`, // Zodiac
   },
   {
     id: "4",
@@ -67,6 +76,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#004d40",
     type: "MOVIE",
     rating: "R",
+    posterUrl: `${P}/8UlWHLMpgZm9bx6QYh0NFoq67TZ.jpg`, // Blade Runner 2049
   },
   {
     id: "5",
@@ -80,6 +90,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#003c71",
     type: "MOVIE",
     rating: "PG",
+    posterUrl: `${P}/lyuH56T4C9q1QhNk3kCmCHBwU4K.jpg`, // Marriage Story
   },
   {
     id: "6",
@@ -93,6 +104,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#003300",
     type: "MOVIE",
     rating: "PG-13",
+    posterUrl: `${P}/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg`, // Doctor Strange
   },
   {
     id: "7",
@@ -106,6 +118,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#263238",
     type: "MOVIE",
     rating: "R",
+    posterUrl: `${P}/aTU9lxBl7PpGKFe7qMNcHIfEbNF.jpg`, // Tinker Tailor Soldier Spy
   },
   {
     id: "8",
@@ -119,6 +132,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#002171",
     type: "MOVIE",
     rating: "R",
+    posterUrl: `${P}/eDtsTxALld2gPw9RCe22VJfPSBx.jpg`, // Life (2017)
   },
   {
     id: "9",
@@ -133,6 +147,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     type: "SHOW",
     rating: "TV-MA",
     episodeInfo: "Season 1 · 8 Episodes",
+    posterUrl: `${P}/49WJfeN0moxb9IPfGn8AIqMGskD.jpg`, // Twin Peaks
   },
   {
     id: "10",
@@ -147,6 +162,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     type: "SHOW",
     rating: "TV-14",
     episodeInfo: "Season 2 · 10 Episodes",
+    posterUrl: `${P}/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg`, // The Boys
   },
   {
     id: "11",
@@ -161,6 +177,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     type: "SHOW",
     rating: "TV-MA",
     episodeInfo: "Season 1 · 6 Episodes",
+    posterUrl: `${P}/ggFHVNu6YYI5L9pCfOacjizRGt.jpg`, // Narcos
   },
   {
     id: "12",
@@ -175,6 +192,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     type: "SHOW",
     rating: "TV-14",
     episodeInfo: "Season 1 · 8 Episodes",
+    posterUrl: `${P}/xPBapSNNMhQp7IWyxUjTbF8XPVC.jpg`, // Westworld
   },
   {
     id: "13",
@@ -189,6 +207,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     type: "SHOW",
     rating: "TV-MA",
     episodeInfo: "Season 3 · 12 Episodes",
+    posterUrl: `${P}/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg`, // Game of Thrones
   },
   {
     id: "14",
@@ -202,6 +221,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#102027",
     type: "MOVIE",
     rating: "R",
+    posterUrl: `${P}/b4gYVcl8pParX7PoTnqnLqhLEJT.jpg`, // Alien Covenant
   },
   {
     id: "15",
@@ -215,6 +235,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#000051",
     type: "MOVIE",
     rating: "PG-13",
+    posterUrl: `${P}/5c2ZkGvRCPqkQ1r7Y9eGjtF7wC3.jpg`, // The Big Short
   },
   {
     id: "16",
@@ -228,6 +249,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#00251a",
     type: "MOVIE",
     rating: "PG-13",
+    posterUrl: `${P}/ekZobS8isE6mA53RAiGDG93hBxL.jpg`, // The Abyss
   },
   {
     id: "17",
@@ -241,6 +263,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#1a0000",
     type: "MOVIE",
     rating: "PG-13",
+    posterUrl: `${P}/6CoRTJTmijhBLJTUNoVSUNxZMEI.jpg`, // San Andreas
   },
   {
     id: "18",
@@ -255,6 +278,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     type: "SHOW",
     rating: "TV-14",
     episodeInfo: "Season 2 · 8 Episodes",
+    posterUrl: `${P}/oIF2pinu0TGNWBG2TaLO9DQDJ1C.jpg`, // Mandalorian
   },
   {
     id: "19",
@@ -268,6 +292,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     backdropColor: "#1a0072",
     type: "MOVIE",
     rating: "R",
+    posterUrl: `${P}/5cGPUGTjIlMr8gAT5v5smdBQnAd.jpg`, // The Matrix Resurrections
   },
   {
     id: "20",
@@ -282,6 +307,7 @@ export const FAKE_MEDIA: MediaItem[] = [
     type: "SHOW",
     rating: "TV-14",
     episodeInfo: "Season 1 · 6 Episodes",
+    posterUrl: `${P}/sHEvOfSCLWKE5SKVS1OjBLFnTH1.jpg`, // Marco Polo
   },
 ];
 

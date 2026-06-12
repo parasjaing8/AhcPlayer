@@ -73,8 +73,10 @@ export function HeroCarousel({ items }: HeroCarouselProps) {
         </Text>
         <View style={styles.buttons}>
           <Pressable
-            style={styles.playBtn}
+            style={({ focused }) => [styles.playBtn, focused && styles.playBtnFocused]}
             onPress={() => router.push(`/player/${item.id}`)}
+            isTVSelectable
+            hasTVPreferredFocus
           >
             <Feather name="play" size={16} color="#000" />
             <Text style={styles.playBtnText}>Play</Text>
@@ -172,6 +174,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 11,
     borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  playBtnFocused: {
+    borderColor: colors.focusHighlight,
   },
   playBtnText: {
     color: "#000",

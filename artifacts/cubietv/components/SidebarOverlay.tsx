@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
+  BackHandler,
   Platform,
   Pressable,
   ScrollView,
@@ -40,6 +41,15 @@ export function SidebarOverlay({ visible, onClose }: SidebarOverlayProps) {
       }),
     ]).start();
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, onClose]);
 
   return (
     <View
@@ -83,6 +93,7 @@ export function SidebarOverlay({ visible, onClose }: SidebarOverlayProps) {
         <SidebarItem
           icon="settings"
           label="Settings"
+          preferFocus={visible}
           onPress={() => { onClose(); router.push("/settings"); }}
         />
         <SidebarItem
@@ -99,22 +110,37 @@ function SidebarItem({
   icon,
   label,
   active,
+  preferFocus,
   onPress,
 }: {
   icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
   active?: boolean;
+  preferFocus?: boolean;
   onPress?: () => void;
 }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  const onFocus = () =>
+    Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 50, bounciness: 0 }).start();
+  const onBlur = () =>
+    Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 50, bounciness: 0 }).start();
+
+  const bg = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [active ? "rgba(229,9,20,0.12)" : "transparent", "rgba(255,255,255,0.18)"],
+  });
+  const borderColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["transparent", colors.focusHighlight],
+  });
+
   return (
-    <Pressable
-      style={[styles.item, active && styles.itemActive]}
-      onPress={onPress}
-      isTVSelectable
-    >
-      <Feather name={icon} size={17} color={active ? colors.primary : colors.muted} />
-      <Text style={[styles.itemLabel, active && styles.itemLabelActive]}>{label}</Text>
-      {active && <Feather name="check" size={14} color={colors.primary} />}
+    <Pressable onFocus={onFocus} onBlur={onBlur} onPress={onPress} isTVSelectable focusable hasTVPreferredFocus={preferFocus}>
+      <Animated.View style={[styles.item, { backgroundColor: bg, borderLeftColor: borderColor }]}>
+        <Feather name={icon} size={17} color={active ? colors.primary : colors.muted} />
+        <Text style={[styles.itemLabel, active && styles.itemLabelActive]}>{label}</Text>
+        {active && <Feather name="check" size={14} color={colors.primary} />}
+      </Animated.View>
     </Pressable>
   );
 }
@@ -183,8 +209,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 13,
+    borderLeftWidth: 2,
   },
-  itemActive: { backgroundColor: "rgba(229,9,20,0.12)" },
   itemLabel: { color: colors.muted, fontSize: 15, fontWeight: "500", flex: 1 },
   itemLabelActive: { color: colors.foreground },
 });
