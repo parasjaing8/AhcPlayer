@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
+import { useSources } from "@/hooks/useSources";
 
 type SourceType = "smb" | "dlna";
 type TestStatus = "idle" | "testing" | "success" | "fail";
@@ -30,6 +31,8 @@ export default function SourceSetupScreen() {
   const [scanning, setScanning] = useState(false);
   const [foundServers, setFoundServers] = useState<string[]>([]);
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
+  const [saving, setSaving] = useState(false);
+  const { addSource } = useSources();
 
   const scanNetwork = () => {
     setScanning(true);
@@ -51,7 +54,17 @@ export default function SourceSetupScreen() {
     }, 1500);
   };
 
-  const save = () => {
+  const save = async () => {
+    setSaving(true);
+    await addSource({
+      name: shareName || address,
+      type: sourceType,
+      address,
+      shareName,
+      username,
+      password,
+    });
+    setSaving(false);
     router.replace("/library");
   };
 
@@ -189,9 +202,11 @@ export default function SourceSetupScreen() {
             )}
           </Pressable>
 
-          <Pressable style={styles.saveBtn} onPress={save}>
-            <Feather name="save" size={16} color="#000" />
-            <Text style={styles.saveBtnText}>Save Source</Text>
+          <Pressable style={styles.saveBtn} onPress={save} disabled={saving}>
+            {saving
+              ? <ActivityIndicator size="small" color="#000" />
+              : <Feather name="save" size={16} color="#000" />}
+            <Text style={styles.saveBtnText}>{saving ? "Saving…" : "Save Source"}</Text>
           </Pressable>
         </View>
 

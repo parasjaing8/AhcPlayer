@@ -3,6 +3,7 @@ import {
   Animated,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -10,6 +11,7 @@ import {
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import colors from "@/constants/colors";
+import { useSources } from "@/hooks/useSources";
 
 interface SidebarOverlayProps {
   visible: boolean;
@@ -19,6 +21,7 @@ interface SidebarOverlayProps {
 const SIDEBAR_W = 260;
 
 export function SidebarOverlay({ visible, onClose }: SidebarOverlayProps) {
+  const { sources } = useSources();
   const translateX = useRef(new Animated.Value(-SIDEBAR_W)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const nd = Platform.OS !== "web";
@@ -60,9 +63,20 @@ export function SidebarOverlay({ visible, onClose }: SidebarOverlayProps) {
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionLabel}>Library</Text>
-        <SidebarItem icon="hard-drive" label="Personal" active onPress={onClose} />
-        <SidebarItem icon="globe" label="Public" onPress={onClose} />
+        <Text style={styles.sectionLabel}>Sources</Text>
+        <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+          {sources.length === 0 && (
+            <Text style={styles.noSources}>No sources saved</Text>
+          )}
+          {sources.map((s) => (
+            <SidebarItem
+              key={s.id}
+              icon="hard-drive"
+              label={s.name}
+              onPress={() => { onClose(); router.push({ pathname: `/browse/${s.id}`, params: { path: "" } }); }}
+            />
+          ))}
+        </ScrollView>
 
         <View style={styles.divider} />
 
@@ -155,6 +169,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     paddingHorizontal: 20,
     marginBottom: 4,
+  },
+  noSources: {
+    color: colors.muted,
+    fontSize: 13,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    fontStyle: "italic",
   },
   item: {
     flexDirection: "row",

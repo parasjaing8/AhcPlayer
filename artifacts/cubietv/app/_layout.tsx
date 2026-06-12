@@ -28,6 +28,7 @@ function RootLayoutNav() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="source-setup" />
       <Stack.Screen name="discovery" />
+      <Stack.Screen name="browse/[sourceId]" />
     </Stack>
   );
 }

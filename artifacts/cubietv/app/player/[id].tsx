@@ -14,9 +14,13 @@ import { PlayerOverlay } from "@/components/PlayerOverlay";
 import { useTVRemote } from "@/hooks/useTVRemote";
 
 export default function PlayerScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, url: urlParam, title: titleParam } = useLocalSearchParams<{ id: string; url?: string; title?: string }>();
   const insets = useSafeAreaInsets();
-  const item = FAKE_MEDIA.find((m) => m.id === id) ?? FAKE_MEDIA[0];
+
+  // Direct URL playback (from file browser) takes priority over fake data lookup
+  const streamUrl = urlParam ? decodeURIComponent(urlParam) : null;
+  const item = streamUrl ? null : (FAKE_MEDIA.find((m) => m.id === id) ?? FAKE_MEDIA[0]);
+  const mediaTitle = titleParam ?? item?.title ?? "Playing";
 
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [playing, setPlaying] = useState(true);
@@ -64,7 +68,7 @@ export default function PlayerScreen() {
       </Pressable>
 
       <PlayerOverlay
-        title={item.title}
+        title={mediaTitle}
         visible={overlayVisible}
         playing={playing}
         onTogglePlay={() => { setPlaying((p) => !p); showOverlay(); }}
