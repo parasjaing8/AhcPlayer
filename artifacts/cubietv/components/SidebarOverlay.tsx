@@ -91,9 +91,14 @@ export function SidebarOverlay({ visible, onClose }: SidebarOverlayProps) {
         <View style={styles.divider} />
 
         <SidebarItem
+          icon="link"
+          label="Play URL"
+          preferFocus={visible}
+          onPress={() => { onClose(); router.push("/play-url"); }}
+        />
+        <SidebarItem
           icon="settings"
           label="Settings"
-          preferFocus={visible}
           onPress={() => { onClose(); router.push("/settings"); }}
         />
         <SidebarItem

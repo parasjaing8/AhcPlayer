@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Animated,
   Dimensions,
@@ -17,6 +17,27 @@ import type { MediaItem } from "@/data/fakeData";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const HERO_HEIGHT = Math.round(SCREEN_W * 0.52);
+
+function CarouselPlayBtn({ onPress }: { onPress: () => void }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+      hasTVPreferredFocus
+    >
+      <Animated.View style={[styles.playBtn, {
+        borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ["transparent", colors.focusHighlight] }),
+        transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] }) }],
+      }]}>
+        <Feather name="play" size={16} color="#000" />
+        <Text style={styles.playBtnText}>Play</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 interface HeroCarouselProps {
   items: MediaItem[];
@@ -72,15 +93,7 @@ export function HeroCarousel({ items }: HeroCarouselProps) {
           {item.synopsis}
         </Text>
         <View style={styles.buttons}>
-          <Pressable
-            style={({ focused }) => [styles.playBtn, focused && styles.playBtnFocused]}
-            onPress={() => router.push(`/player/${item.id}`)}
-            isTVSelectable
-            hasTVPreferredFocus
-          >
-            <Feather name="play" size={16} color="#000" />
-            <Text style={styles.playBtnText}>Play</Text>
-          </Pressable>
+          <CarouselPlayBtn onPress={() => router.push(`/player/${item.id}`)} />
           <TVButton
             label="More Info"
             variant="ghost"

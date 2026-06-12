@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  BackHandler,
   FlatList,
   Pressable,
   StyleSheet,
@@ -24,6 +26,14 @@ export default function PersonalScreen() {
   const [videos, setVideos] = useState<MediaLibrary.Asset[]>([]);
   const [photos, setPhotos] = useState<MediaLibrary.Asset[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.back();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (permission?.granted) loadMedia();
@@ -77,9 +87,7 @@ export default function PersonalScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} isTVSelectable hasTVPreferredFocus>
-          <Feather name="arrow-left" size={20} color={colors.foreground} />
-        </Pressable>
+        <BackBtn onPress={() => router.back()} />
         <Text style={styles.headerTitle}>Personal Space</Text>
       </View>
 
@@ -97,8 +105,8 @@ export default function PersonalScreen() {
               keyExtractor={(a) => a.id}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.row}
-              renderItem={({ item: asset }) => (
-                <AssetThumb asset={asset} isVideo={section.title === "Videos"} />
+              renderItem={({ item: asset, index }) => (
+                <AssetThumb asset={asset} isVideo={section.title === "Videos"} preferFocus={index === 0} />
               )}
             />
           </View>
@@ -108,29 +116,58 @@ export default function PersonalScreen() {
   );
 }
 
-function AssetThumb({ asset, isVideo }: { asset: MediaLibrary.Asset; isVideo: boolean }) {
+function BackBtn({ onPress }: { onPress: () => void }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
   return (
     <Pressable
-      style={({ focused }) => [styles.thumb, focused && styles.thumbFocused]}
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+      hasTVPreferredFocus
+    >
+      <Animated.View style={[styles.backBtn, {
+        backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [colors.surfaceVariant, colors.focusHighlight] }),
+        transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) }],
+      }]}>
+        <Feather name="arrow-left" size={20} color={colors.foreground} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function AssetThumb({ asset, isVideo, preferFocus }: { asset: MediaLibrary.Asset; isVideo: boolean; preferFocus?: boolean }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
       onPress={() => {
         if (isVideo) {
           router.push({
-            pathname: "/player/[id]",
-            params: { id: asset.id, url: encodeURIComponent(asset.uri), title: asset.filename },
+            pathname: "/player/stream",
+            params: { url: encodeURIComponent(asset.uri), title: asset.filename },
           });
         }
       }}
       isTVSelectable
       focusable
+      hasTVPreferredFocus={preferFocus}
     >
-      <Image source={{ uri: asset.uri }} style={styles.thumbImg} contentFit="cover" />
-      {isVideo && (
-        <View style={styles.playOverlay}>
-          <Feather name="play-circle" size={28} color="rgba(255,255,255,0.9)" />
-          <Text style={styles.duration}>{formatDuration(asset.duration ?? 0)}</Text>
-        </View>
-      )}
-      <Text style={styles.thumbLabel} numberOfLines={1}>{asset.filename}</Text>
+      <Animated.View style={[styles.thumb, {
+        borderWidth: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 2.5] }),
+        borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ["transparent", colors.focusHighlight] }),
+        transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }],
+      }]}>
+        <Image source={{ uri: asset.uri }} style={styles.thumbImg} contentFit="cover" />
+        {isVideo && (
+          <View style={styles.playOverlay}>
+            <Feather name="play-circle" size={28} color="rgba(255,255,255,0.9)" />
+            <Text style={styles.duration}>{formatDuration(asset.duration ?? 0)}</Text>
+          </View>
+        )}
+        <Text style={styles.thumbLabel} numberOfLines={1}>{asset.filename}</Text>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -159,7 +196,6 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceVariant,
   },
   headerTitle: { color: colors.foreground, fontSize: 20, fontWeight: "700" },
   content: { paddingVertical: 20, paddingBottom: 40 },
@@ -177,11 +213,6 @@ const styles = StyleSheet.create({
     borderRadius: colors.radius,
     overflow: "hidden",
     backgroundColor: colors.surface,
-  },
-  thumbFocused: {
-    borderWidth: 2,
-    borderColor: colors.focusHighlight,
-    transform: [{ scale: 1.05 }],
   },
   thumbImg: { width: THUMB_W, height: THUMB_H },
   playOverlay: {

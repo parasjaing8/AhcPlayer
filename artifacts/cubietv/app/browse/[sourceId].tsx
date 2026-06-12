@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  BackHandler,
   FlatList,
   Platform,
   Pressable,
@@ -13,7 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
 import { useSources } from "@/hooks/useSources";
-import { browseSource, formatSize, isVideoFile, smbUrl, type FileEntry } from "@/services/AhcClient";
+import { browseSource, buildPlayUrl, formatSize, isMediaFile, isVideoFile, type FileEntry } from "@/services/AhcClient";
 
 export default function BrowseScreen() {
   const { sourceId, path = "" } = useLocalSearchParams<{ sourceId: string; path?: string }>();
@@ -31,9 +33,9 @@ export default function BrowseScreen() {
     setLoading(true);
     setError(null);
     try {
-      const result = await browseSource(source, path);
+      const result = await browseSource(source, path as string);
       setEntries(result);
-    } catch (e) {
+    } catch {
       setError("Could not load directory.");
     } finally {
       setLoading(false);
@@ -42,26 +44,32 @@ export default function BrowseScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openEntry = (entry: FileEntry) => {
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.back();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
+  const openEntry = useCallback((entry: FileEntry) => {
     if (entry.type === "dir") {
       router.push({ pathname: `/browse/${sourceId}`, params: { path: entry.path } });
-    } else if (source && isVideoFile(entry)) {
-      const url = smbUrl(source, entry.path);
+    } else if (source && isMediaFile(entry)) {
+      const url = buildPlayUrl(source, entry.path);
       router.push({
         pathname: `/player/stream`,
         params: { url: encodeURIComponent(url), title: entry.name },
       });
     }
-  };
+  }, [source, sourceId]);
 
-  const breadcrumbs = ["Home", ...path.split("/").filter(Boolean)];
+  const breadcrumbs = ["Home", ...(path as string).split("/").filter(Boolean)];
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} isTVSelectable>
-          <Feather name="arrow-left" size={20} color={colors.foreground} />
-        </Pressable>
+        <BackBtn onPress={() => router.back()} />
         <View style={styles.titleArea}>
           <Text style={styles.sourceName} numberOfLines={1}>
             {source?.name ?? "Browse"}
@@ -112,6 +120,27 @@ export default function BrowseScreen() {
   );
 }
 
+function BackBtn({ onPress }: { onPress: () => void }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+      hasTVPreferredFocus
+    >
+      <Animated.View style={[styles.backBtn, {
+        backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [colors.surface, colors.focusHighlight] }),
+      }]}>
+        <Animated.View style={{ transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) }] }}>
+          <Feather name="arrow-left" size={20} color={colors.foreground} />
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 function BreadcrumbRow({ crumbs }: { crumbs: string[] }) {
   return (
     <View style={styles.breadcrumbs}>
@@ -141,35 +170,44 @@ function EntryRow({
 }) {
   const isDir = entry.type === "dir";
   const isVideo = isVideoFile(entry);
+  const isMedia = isMediaFile(entry);
+  const focusAnim = useRef(new Animated.Value(0)).current;
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
       onPress={onPress}
       isTVSelectable
       hasTVPreferredFocus={preferFocus}
     >
-      <View style={[styles.iconWrap, isDir && styles.iconWrapDir]}>
+      <Animated.View style={[styles.row, {
+        backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ["transparent", "rgba(255,255,255,0.08)"] }),
+        borderLeftColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ["transparent", colors.focusHighlight] }),
+        borderLeftWidth: 3,
+      }]}>
+        <View style={[styles.iconWrap, isDir && styles.iconWrapDir]}>
+          <Feather
+            name={isDir ? "folder" : isVideo ? "film" : isMedia ? "music" : "file"}
+            size={18}
+            color={isDir ? colors.primary : isMedia ? colors.foreground : colors.muted}
+          />
+        </View>
+        <View style={styles.rowInfo}>
+          <Text style={styles.rowName} numberOfLines={1}>{entry.name}</Text>
+          {entry.size != null && (
+            <Text style={styles.rowMeta}>{formatSize(entry.size)}</Text>
+          )}
+          {entry.ext && !isMedia && entry.type === "file" && (
+            <Text style={styles.rowMeta}>{entry.ext.toUpperCase()}</Text>
+          )}
+        </View>
         <Feather
-          name={isDir ? "folder" : isVideo ? "film" : "file"}
+          name={isDir ? "chevron-right" : isMedia ? "play-circle" : "download"}
           size={18}
-          color={isDir ? colors.primary : isVideo ? colors.foreground : colors.muted}
+          color={isMedia ? colors.primary : colors.muted}
         />
-      </View>
-      <View style={styles.rowInfo}>
-        <Text style={styles.rowName} numberOfLines={1}>{entry.name}</Text>
-        {entry.size != null && (
-          <Text style={styles.rowMeta}>{formatSize(entry.size)}</Text>
-        )}
-        {entry.ext && !isVideo && entry.type === "file" && (
-          <Text style={styles.rowMeta}>{entry.ext.toUpperCase()}</Text>
-        )}
-      </View>
-      <Feather
-        name={isDir ? "chevron-right" : isVideo ? "play-circle" : "download"}
-        size={18}
-        color={isVideo ? colors.primary : colors.muted}
-      />
+      </Animated.View>
     </Pressable>
   );
 }
@@ -190,7 +228,6 @@ const styles = StyleSheet.create({
     height: 36,
     marginTop: 2,
     borderRadius: 18,
-    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -224,16 +261,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   retryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  list: { paddingHorizontal: 16, paddingVertical: 8 },
+  list: { paddingHorizontal: 0, paddingVertical: 4 },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
     paddingVertical: 13,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  rowPressed: { backgroundColor: colors.surfaceVariant },
   iconWrap: {
     width: 38,
     height: 38,

@@ -1,10 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 
+export type SourceType = "smb" | "ftp" | "http" | "dlna" | "internal";
+
 export interface Source {
   id: string;
   name: string;
-  type: "smb" | "dlna";
+  type: SourceType;
   address: string;
   shareName: string;
   username?: string;

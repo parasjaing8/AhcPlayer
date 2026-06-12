@@ -80,6 +80,49 @@ function NavBtn({ nav, isActive, onNav }: NavBtnProps) {
   );
 }
 
+function HeroPlayBtn({ btnRef, onPress, preferFocus }: { btnRef: React.Ref<any>; onPress: () => void; preferFocus?: boolean }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      ref={btnRef}
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+      hasTVPreferredFocus={preferFocus}
+    >
+      <Animated.View style={[styles.playBtn, {
+        borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ["transparent", colors.focusHighlight] }),
+        transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] }) }],
+      }]}>
+        <Feather name="play" size={14} color="#000" />
+        <Text style={styles.playBtnText}>Play</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function HeroInfoBtn({ btnRef, onPress }: { btnRef: React.Ref<any>; onPress: () => void }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      ref={btnRef}
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+    >
+      <Animated.View style={[styles.infoBtn, {
+        borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ["rgba(255,255,255,0.4)", colors.focusHighlight] }),
+        backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ["transparent", "rgba(255,255,255,0.1)"] }),
+        transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] }) }],
+      }]}>
+        <Text style={styles.infoBtnText}>More Info</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function LibraryScreen() {
   const [activeNav, setActiveNav] = useState<string>("all");
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -156,24 +199,15 @@ export default function LibraryScreen() {
             <Text style={styles.heroGenre}>{heroItem.genre}</Text>
             <Text style={styles.heroSynopsis} numberOfLines={2}>{heroItem.synopsis}</Text>
             <View style={styles.heroButtons}>
-              <Pressable
-                ref={playBtnRef}
-                style={({ focused }) => [styles.playBtn, focused && styles.playBtnFocused]}
+              <HeroPlayBtn
+                btnRef={playBtnRef}
                 onPress={() => router.push(`/player/${heroItem.id}`)}
-                isTVSelectable
-                hasTVPreferredFocus
-              >
-                <Feather name="play" size={14} color="#000" />
-                <Text style={styles.playBtnText}>Play</Text>
-              </Pressable>
-              <Pressable
-                ref={infoBtnRef}
-                style={({ focused }) => [styles.infoBtn, focused && styles.infoBtnFocused]}
+                preferFocus
+              />
+              <HeroInfoBtn
+                btnRef={infoBtnRef}
                 onPress={() => router.push(`/detail/${heroItem.id}`)}
-                isTVSelectable
-              >
-                <Text style={styles.infoBtnText}>More Info</Text>
-              </Pressable>
+              />
             </View>
           </View>
         </Animated.View>

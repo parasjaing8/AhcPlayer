@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  BackHandler,
   Dimensions,
   Platform,
   Pressable,
@@ -8,16 +10,19 @@ import {
   Text,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
 import { FAKE_MEDIA, MOVIES } from "@/data/fakeData";
 import { MediaCard } from "@/components/MediaCard";
-import { TVButton } from "@/components/TVButton";
 
 const { width: W } = Dimensions.get("window");
 const BACKDROP_H = Math.round(W * 0.5);
+
+const KEY_WATCHLIST = (id: string) => `@cubietv:watchlist:${id}`;
+const KEY_WATCHED = (id: string) => `@cubietv:watched:${id}`;
 
 export default function DetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,19 +33,51 @@ export default function DetailScreen() {
   const item = FAKE_MEDIA.find((m) => m.id === id) ?? FAKE_MEDIA[0];
   const moreLike = MOVIES.filter((m) => m.id !== item.id).slice(0, 8);
 
+  const [watchlisted, setWatchlisted] = useState(false);
+  const [watched, setWatched] = useState(false);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.back();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem(KEY_WATCHLIST(item.id)),
+      AsyncStorage.getItem(KEY_WATCHED(item.id)),
+    ]).then(([w, wd]) => {
+      setWatchlisted(w === "1");
+      setWatched(wd === "1");
+    });
+  }, [item.id]);
+
+  const toggleWatchlist = useCallback(async () => {
+    const next = !watchlisted;
+    setWatchlisted(next);
+    await AsyncStorage.setItem(KEY_WATCHLIST(item.id), next ? "1" : "0");
+  }, [watchlisted, item.id]);
+
+  const toggleWatched = useCallback(async () => {
+    const next = !watched;
+    setWatched(next);
+    await AsyncStorage.setItem(KEY_WATCHED(item.id), next ? "1" : "0");
+  }, [watched, item.id]);
+
   return (
     <View style={styles.root}>
       <View style={[styles.backdrop, { backgroundColor: item.backdropColor, height: BACKDROP_H }]}>
         <View style={styles.backdropOverlay} />
       </View>
 
-      <Pressable
+      <FocusBtn
         style={[styles.backBtn, { top: topPad + 8 }]}
         onPress={() => router.back()}
-        isTVSelectable
       >
         <Feather name="arrow-left" size={20} color={colors.foreground} />
-      </Pressable>
+      </FocusBtn>
 
       <ScrollView
         style={styles.scroll}
@@ -66,34 +103,33 @@ export default function DetailScreen() {
           </View>
 
           <View style={styles.actions}>
-            <Pressable
-              style={styles.playBtn}
+            <PlayBtn
+              label="Play"
+              icon="play"
               onPress={() => router.push(`/player/${item.id}`)}
-              isTVSelectable
-              hasTVPreferredFocus
-            >
-              <Feather name="play" size={16} color="#000" />
-              <Text style={styles.playBtnText}>Play</Text>
-            </Pressable>
+              primary
+              preferFocus
+            />
 
             {(item.progressPct ?? 0) > 0 && (
-              <TVButton
-                label={`Resume`}
-                variant="secondary"
-                icon={<Feather name="play-circle" size={15} color={colors.foreground} />}
+              <PlayBtn
+                label="Resume"
+                icon="play-circle"
                 onPress={() => router.push(`/player/${item.id}`)}
               />
             )}
 
-            <TVButton
-              label="Watchlist"
-              variant="ghost"
-              icon={<Feather name="plus" size={15} color="rgba(255,255,255,0.85)" />}
+            <PlayBtn
+              label={watchlisted ? "In List" : "Watchlist"}
+              icon={watchlisted ? "check-circle" : "plus"}
+              onPress={toggleWatchlist}
+              active={watchlisted}
             />
-            <TVButton
-              label="Watched"
-              variant="ghost"
-              icon={<Feather name="check" size={15} color="rgba(255,255,255,0.85)" />}
+            <PlayBtn
+              label={watched ? "Watched" : "Mark Watched"}
+              icon="check"
+              onPress={toggleWatched}
+              active={watched}
             />
           </View>
 
@@ -111,6 +147,73 @@ export default function DetailScreen() {
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+function FocusBtn({
+  children, onPress, style, preferFocus,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: any;
+  preferFocus?: boolean;
+}) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+      hasTVPreferredFocus={preferFocus}
+    >
+      <Animated.View style={[style, {
+        borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ["rgba(255,255,255,0.2)", colors.focusHighlight] }),
+        transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
+      }]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function PlayBtn({
+  label, icon, onPress, primary, active, preferFocus,
+}: {
+  label: string;
+  icon: React.ComponentProps<typeof Feather>["name"];
+  onPress?: () => void;
+  primary?: boolean;
+  active?: boolean;
+  preferFocus?: boolean;
+}) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+      hasTVPreferredFocus={preferFocus}
+    >
+      <Animated.View style={[
+        styles.actionBtn,
+        primary && styles.actionBtnPrimary,
+        active && styles.actionBtnActive,
+        {
+          borderColor: focusAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [primary ? "#fff" : active ? colors.primary : "rgba(255,255,255,0.25)", colors.focusHighlight],
+          }),
+          transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
+        },
+      ]}>
+        <Feather name={icon} size={15} color={primary ? "#000" : active ? colors.primary : "rgba(255,255,255,0.85)"} />
+        <Text style={[styles.actionBtnText, primary && styles.actionBtnTextPrimary, active && styles.actionBtnTextActive]}>
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -134,6 +237,8 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     backgroundColor: "rgba(0,0,0,0.55)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -188,16 +293,37 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 28,
   },
-  playBtn: {
+  actionBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    backgroundColor: "#fff",
-    paddingHorizontal: 22,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingHorizontal: 18,
     paddingVertical: 11,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
   },
-  playBtnText: { color: "#000", fontSize: 15, fontWeight: "700" },
+  actionBtnPrimary: {
+    backgroundColor: "#fff",
+    borderColor: "#fff",
+  },
+  actionBtnActive: {
+    backgroundColor: "rgba(229,9,20,0.15)",
+    borderColor: colors.primary,
+  },
+  actionBtnText: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  actionBtnTextPrimary: {
+    color: "#000",
+    fontWeight: "700",
+  },
+  actionBtnTextActive: {
+    color: colors.primary,
+  },
   divider: {
     height: 1,
     backgroundColor: colors.border,

@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  BackHandler,
   Platform,
   Pressable,
   ScrollView,
@@ -9,21 +11,29 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
-import { useSources } from "@/hooks/useSources";
+import { useSources, type SourceType } from "@/hooks/useSources";
 
-type SourceType = "smb" | "dlna";
 type TestStatus = "idle" | "testing" | "success" | "fail";
+
+const SOURCE_TYPES: { type: SourceType; label: string; icon: React.ComponentProps<typeof Feather>["name"] }[] = [
+  { type: "smb", label: "SMB / Windows Share", icon: "monitor" },
+  { type: "ftp", label: "FTP", icon: "server" },
+  { type: "http", label: "HTTP / Web", icon: "globe" },
+  { type: "dlna", label: "DLNA / UPnP", icon: "radio" },
+];
 
 export default function SourceSetupScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
 
   const [sourceType, setSourceType] = useState<SourceType>("smb");
+  const [name, setName] = useState("");
   const [address, setAddress] = useState("192.168.1.100");
   const [shareName, setShareName] = useState("Media");
   const [username, setUsername] = useState("guest");
@@ -32,7 +42,29 @@ export default function SourceSetupScreen() {
   const [foundServers, setFoundServers] = useState<string[]>([]);
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [saving, setSaving] = useState(false);
-  const { addSource } = useSources();
+  const { sources, addSource, updateSource } = useSources();
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.back();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (editId) {
+      const s = sources.find((x) => x.id === editId);
+      if (s) {
+        setSourceType(s.type);
+        setName(s.name);
+        setAddress(s.address);
+        setShareName(s.shareName);
+        setUsername(s.username ?? "");
+        setPassword(s.password ?? "");
+      }
+    }
+  }, [editId, sources]);
 
   const scanNetwork = () => {
     setScanning(true);
@@ -50,31 +82,39 @@ export default function SourceSetupScreen() {
   const testConnection = () => {
     setTestStatus("testing");
     setTimeout(() => {
-      setTestStatus(address.startsWith("192") ? "success" : "fail");
+      setTestStatus(address.startsWith("192") || address.startsWith("http") ? "success" : "fail");
     }, 1500);
   };
 
   const save = async () => {
     setSaving(true);
-    await addSource({
-      name: shareName || address,
+    const data = {
+      name: name || shareName || address,
       type: sourceType,
       address,
       shareName,
       username,
       password,
-    });
+    };
+    if (editId) {
+      await updateSource(editId, data);
+    } else {
+      await addSource(data);
+    }
     setSaving(false);
-    router.replace("/library");
+    router.replace("/settings");
   };
+
+  const needsShare = sourceType === "smb" || sourceType === "ftp";
+  const needsAuth = sourceType === "smb" || sourceType === "ftp";
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+        <FocusBtn style={styles.backBtn} onPress={() => router.back()} preferFocus>
           <Feather name="arrow-left" size={20} color={colors.foreground} />
-        </Pressable>
-        <Text style={styles.heading}>Add Media Source</Text>
+        </FocusBtn>
+        <Text style={styles.heading}>{editId ? "Edit Source" : "Add Media Source"}</Text>
       </View>
 
       <ScrollView
@@ -83,141 +123,150 @@ export default function SourceSetupScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <SectionLabel label="Source Type" />
-        <View style={styles.typeRow}>
-          <TypeToggle
-            label="SMB / Windows Share"
-            selected={sourceType === "smb"}
-            onPress={() => setSourceType("smb")}
-          />
-          <TypeToggle
-            label="DLNA / UPnP"
-            selected={sourceType === "dlna"}
-            onPress={() => setSourceType("dlna")}
-          />
+        <View style={styles.typeGrid}>
+          {SOURCE_TYPES.map(({ type, label, icon }) => (
+            <TypeToggle
+              key={type}
+              icon={icon}
+              label={label}
+              selected={sourceType === type}
+              onPress={() => setSourceType(type)}
+            />
+          ))}
         </View>
 
-        {sourceType === "smb" && (
+        <SectionLabel label="Details" />
+        <FocusField label="Display Name" value={name} onChangeText={setName} placeholder={shareName || address} />
+        <FocusField label="Server Address" value={address} onChangeText={setAddress} placeholder={sourceType === "http" ? "http://192.168.1.100" : "192.168.1.100"} />
+        {needsShare && (
+          <FocusField label="Share / Path" value={shareName} onChangeText={setShareName} placeholder="Media" />
+        )}
+        {needsAuth && (
           <>
-            <SectionLabel label="SMB Details" />
-            <FormField
-              label="Server Address"
-              value={address}
-              onChangeText={setAddress}
-              placeholder="192.168.1.100"
-            />
-            <FormField
-              label="Share Name"
-              value={shareName}
-              onChangeText={setShareName}
-              placeholder="Media"
-            />
-            <FormField
-              label="Username"
-              value={username}
-              onChangeText={setUsername}
-              placeholder="guest"
-            />
-            <FormField
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              secureTextEntry
-            />
+            <FocusField label="Username" value={username} onChangeText={setUsername} placeholder="guest" />
+            <FocusField label="Password" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
           </>
         )}
 
-        <SectionLabel label="Auto-Discover" />
-        <Pressable style={styles.scanBtn} onPress={scanNetwork}>
-          {scanning ? (
-            <ActivityIndicator size="small" color={colors.foreground} />
-          ) : (
-            <Feather name="wifi" size={16} color={colors.foreground} />
-          )}
-          <Text style={styles.scanBtnText}>
-            {scanning ? "Scanning..." : "Scan Network"}
-          </Text>
-        </Pressable>
+        {(sourceType === "smb" || sourceType === "dlna") && (
+          <>
+            <SectionLabel label="Auto-Discover" />
+            <FocusBtn style={styles.scanBtn} onPress={scanNetwork}>
+              {scanning ? (
+                <ActivityIndicator size="small" color={colors.foreground} />
+              ) : (
+                <Feather name="wifi" size={16} color={colors.foreground} />
+              )}
+              <Text style={styles.scanBtnText}>{scanning ? "Scanning..." : "Scan Network"}</Text>
+            </FocusBtn>
 
-        {foundServers.length > 0 && (
-          <View style={styles.serverList}>
-            {foundServers.map((s, i) => (
-              <Pressable
-                key={i}
-                style={styles.serverRow}
-                onPress={() => {
-                  const ip = s.match(/(\d+\.\d+\.\d+\.\d+)/)?.[1] ?? "";
-                  setAddress(ip);
-                  setSourceType(s.includes("DLNA") ? "dlna" : "smb");
-                }}
-              >
-                <Feather
-                  name={s.includes("DLNA") ? "radio" : "monitor"}
-                  size={16}
-                  color={colors.muted}
-                />
-                <Text style={styles.serverText}>{s}</Text>
-              </Pressable>
-            ))}
-          </View>
+            {foundServers.length > 0 && (
+              <View style={styles.serverList}>
+                {foundServers.map((s, i) => (
+                  <FocusBtn
+                    key={i}
+                    style={styles.serverRow}
+                    onPress={() => {
+                      const ip = s.match(/(\d+\.\d+\.\d+\.\d+)/)?.[1] ?? "";
+                      setAddress(ip);
+                      setSourceType(s.includes("DLNA") ? "dlna" : "smb");
+                    }}
+                  >
+                    <Feather name={s.includes("DLNA") ? "radio" : "monitor"} size={16} color={colors.muted} />
+                    <Text style={styles.serverText}>{s}</Text>
+                  </FocusBtn>
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         <View style={styles.actionRow}>
-          <Pressable style={styles.secondaryBtn} onPress={testConnection}>
+          <FocusBtn style={styles.secondaryBtn} onPress={testConnection}>
             {testStatus === "testing" ? (
               <ActivityIndicator size="small" color={colors.foreground} />
             ) : (
               <>
                 <Feather
-                  name={
-                    testStatus === "success"
-                      ? "check-circle"
-                      : testStatus === "fail"
-                        ? "x-circle"
-                        : "zap"
-                  }
+                  name={testStatus === "success" ? "check-circle" : testStatus === "fail" ? "x-circle" : "zap"}
                   size={16}
-                  color={
-                    testStatus === "success"
-                      ? "#22c55e"
-                      : testStatus === "fail"
-                        ? colors.primary
-                        : colors.foreground
-                  }
+                  color={testStatus === "success" ? "#22c55e" : testStatus === "fail" ? colors.primary : colors.foreground}
                 />
-                <Text
-                  style={[
-                    styles.secondaryBtnText,
-                    testStatus === "success" && { color: "#22c55e" },
-                    testStatus === "fail" && { color: colors.primary },
-                  ]}
-                >
-                  {testStatus === "success"
-                    ? "Connected"
-                    : testStatus === "fail"
-                      ? "Failed"
-                      : "Test Connection"}
+                <Text style={[
+                  styles.secondaryBtnText,
+                  testStatus === "success" && { color: "#22c55e" },
+                  testStatus === "fail" && { color: colors.primary },
+                ]}>
+                  {testStatus === "success" ? "Connected" : testStatus === "fail" ? "Failed" : "Test Connection"}
                 </Text>
               </>
             )}
-          </Pressable>
+          </FocusBtn>
 
-          <Pressable style={styles.saveBtn} onPress={save} disabled={saving}>
-            {saving
-              ? <ActivityIndicator size="small" color="#000" />
-              : <Feather name="save" size={16} color="#000" />}
+          <FocusBtn style={styles.saveBtn} onPress={save}>
+            {saving ? <ActivityIndicator size="small" color="#000" /> : <Feather name="save" size={16} color="#000" />}
             <Text style={styles.saveBtnText}>{saving ? "Saving…" : "Save Source"}</Text>
-          </Pressable>
+          </FocusBtn>
         </View>
-
-        <Pressable
-          style={styles.discoverBtn}
-          onPress={() => router.push("/discovery")}
-        >
-          <Feather name="search" size={14} color={colors.muted} />
-          <Text style={styles.discoverBtnText}>Browse Discovered Servers</Text>
-        </Pressable>
       </ScrollView>
+    </View>
+  );
+}
+
+function FocusBtn({
+  children, onPress, style, preferFocus,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: any;
+  preferFocus?: boolean;
+}) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+      hasTVPreferredFocus={preferFocus}
+    >
+      <Animated.View style={[style, {
+        borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [StyleSheet.flatten(style)?.borderColor ?? colors.border, colors.focusHighlight] }),
+        transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.03] }) }],
+      }]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function FocusField({
+  label, value, onChangeText, placeholder, secureTextEntry,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder?: string;
+  secureTextEntry?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={[styles.inputWrapper, focused && styles.inputWrapperFocused]}>
+        <TextInput
+          style={styles.input}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.muted}
+          secureTextEntry={secureTextEntry}
+          autoCapitalize="none"
+          autoCorrect={false}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+      </View>
     </View>
   );
 }
@@ -230,56 +279,36 @@ function SectionLabel({ label }: { label: string }) {
   );
 }
 
-function FormField({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  secureTextEntry,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  placeholder?: string;
-  secureTextEntry?: boolean;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.inputWrapper}>
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={colors.muted}
-          secureTextEntry={secureTextEntry}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-    </View>
-  );
-}
-
 function TypeToggle({
-  label,
-  selected,
-  onPress,
+  icon, label, selected, onPress,
 }: {
+  icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
   selected: boolean;
   onPress: () => void;
 }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
   return (
     <Pressable
-      style={[styles.typeBtn, selected && styles.typeBtnSelected]}
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
       onPress={onPress}
+      isTVSelectable
     >
-      <View style={[styles.radio, selected && styles.radioSelected]} />
-      <Text style={[styles.typeLabel, selected && styles.typeLabelSelected]}>
-        {label}
-      </Text>
+      <Animated.View style={[
+        styles.typeBtn,
+        selected && styles.typeBtnSelected,
+        {
+          borderColor: focusAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [selected ? colors.primary : colors.border, colors.focusHighlight],
+          }),
+        },
+      ]}>
+        <Feather name={icon} size={16} color={selected ? colors.primary : colors.muted} />
+        <Text style={[styles.typeLabel, selected && styles.typeLabelSelected]}>{label}</Text>
+        {selected && <Feather name="check" size={14} color={colors.primary} style={{ marginLeft: "auto" }} />}
+      </Animated.View>
     </Pressable>
   );
 }
@@ -298,6 +327,8 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -319,9 +350,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  typeRow: {
+  typeGrid: {
     paddingHorizontal: 18,
-    gap: 10,
+    gap: 8,
   },
   typeBtn: {
     flexDirection: "row",
@@ -336,17 +367,6 @@ const styles = StyleSheet.create({
   typeBtnSelected: {
     borderColor: colors.primary,
     backgroundColor: "rgba(229,9,20,0.1)",
-  },
-  radio: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: colors.muted,
-  },
-  radioSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
   },
   typeLabel: {
     color: colors.muted,
@@ -369,9 +389,12 @@ const styles = StyleSheet.create({
   inputWrapper: {
     backgroundColor: colors.surface,
     borderRadius: colors.radius,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     overflow: "hidden",
+  },
+  inputWrapperFocused: {
+    borderColor: colors.focusHighlight,
   },
   input: {
     color: colors.foreground,
@@ -412,6 +435,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   serverText: {
     color: colors.foreground,
@@ -450,23 +474,12 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: colors.radius,
     backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#fff",
   },
   saveBtnText: {
     color: "#000",
     fontSize: 14,
     fontWeight: "700",
-  },
-  discoverBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 16,
-    marginHorizontal: 18,
-    marginTop: 12,
-  },
-  discoverBtnText: {
-    color: colors.muted,
-    fontSize: 13,
   },
 });

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  BackHandler,
   FlatList,
   Platform,
   Pressable,
@@ -34,6 +36,14 @@ export default function SearchScreen() {
       )
     : [];
 
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.back();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
   const onKey = (key: string) => {
     if (key === "⌫") {
       setQuery((q) => q.slice(0, -1));
@@ -47,9 +57,7 @@ export default function SearchScreen() {
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
       <View style={styles.topBar}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={colors.foreground} />
-        </Pressable>
+        <BackBtn onPress={() => router.back()} />
         <View style={styles.inputRow}>
           <Feather name="search" size={16} color={colors.muted} />
           <Text style={styles.queryText}>
@@ -57,7 +65,7 @@ export default function SearchScreen() {
             <Text style={styles.cursor}>|</Text>
           </Text>
           {query.length > 0 && (
-            <Pressable onPress={() => setQuery("")}>
+            <Pressable onPress={() => setQuery("")} isTVSelectable>
               <Feather name="x" size={16} color={colors.muted} />
             </Pressable>
           )}
@@ -72,19 +80,13 @@ export default function SearchScreen() {
         <View style={styles.keyboard}>
           {KEYS.map((row, ri) => (
             <View key={ri} style={styles.keyRow}>
-              {row.map((key) => (
-                <Pressable
+              {row.map((key, ki) => (
+                <Key
                   key={key}
-                  style={({ pressed }) => [
-                    styles.key,
-                    key === "SPACE" && styles.keySpace,
-                    key === "⌫" && styles.keyDelete,
-                    pressed && styles.keyPressed,
-                  ]}
+                  label={key}
                   onPress={() => onKey(key)}
-                >
-                  <Text style={styles.keyLabel}>{key}</Text>
-                </Pressable>
+                  preferFocus={ri === 0 && ki === 0}
+                />
               ))}
             </View>
           ))}
@@ -124,6 +126,50 @@ export default function SearchScreen() {
   );
 }
 
+function BackBtn({ onPress }: { onPress: () => void }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+    >
+      <Animated.View style={[styles.backBtn, {
+        backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [colors.surface, colors.focusHighlight] }),
+      }]}>
+        <Feather name="arrow-left" size={20} color={colors.foreground} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function Key({ label, onPress, preferFocus }: { label: string; onPress: () => void; preferFocus?: boolean }) {
+  const focusAnim = useRef(new Animated.Value(0)).current;
+  return (
+    <Pressable
+      onFocus={() => Animated.spring(focusAnim, { toValue: 1, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onBlur={() => Animated.spring(focusAnim, { toValue: 0, useNativeDriver: false, speed: 60, bounciness: 0 }).start()}
+      onPress={onPress}
+      isTVSelectable
+      hasTVPreferredFocus={preferFocus}
+    >
+      <Animated.View style={[
+        styles.key,
+        label === "SPACE" && styles.keySpace,
+        label === "⌫" && styles.keyDelete,
+        {
+          backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [colors.surfaceVariant, colors.primary] }),
+          borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [colors.border, colors.primary] }),
+          transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }],
+        },
+      ]}>
+        <Text style={styles.keyLabel}>{label}</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   topBar: {
@@ -137,7 +183,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -178,23 +223,16 @@ const styles = StyleSheet.create({
     minWidth: 34,
     height: 42,
     borderRadius: 6,
-    backgroundColor: colors.surfaceVariant,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   keySpace: {
     minWidth: 120,
   },
   keyDelete: {
     minWidth: 52,
-    backgroundColor: colors.surface,
-  },
-  keyPressed: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   keyLabel: {
     color: colors.foreground,

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Platform,
   Pressable,
   StyleSheet,
@@ -14,32 +15,36 @@ import { FAKE_MEDIA } from "@/data/fakeData";
 import { PlayerOverlay } from "@/components/PlayerOverlay";
 import { useTVRemote } from "@/hooks/useTVRemote";
 
-// VLC is Android-only native module — guard against web/iOS build errors
 let VLCPlayer: any = null;
 if (Platform.OS === "android") {
-  VLCPlayer = require("react-native-vlc-media-player").VLCPlayer;
+  try { VLCPlayer = require("react-native-vlc-media-player").VLCPlayer; } catch {}
 }
 
 export default function PlayerScreen() {
-  const { id, url: urlParam, title: titleParam } = useLocalSearchParams<{
+  const { id, url: urlParam, title: titleParam, startMs } = useLocalSearchParams<{
     id: string;
     url?: string;
     title?: string;
+    startMs?: string;
   }>();
   const insets = useSafeAreaInsets();
 
-  const item = FAKE_MEDIA.find((m) => m.id === id) ?? null;
+  const item = id && id !== "stream" ? FAKE_MEDIA.find((m) => m.id === id) ?? null : null;
   const streamUrl = urlParam
-    ? decodeURIComponent(urlParam)
+    ? decodeURIComponent(urlParam as string)
     : item?.videoUrl ?? null;
-  const mediaTitle = titleParam ?? item?.title ?? "Playing";
+  const mediaTitle = (titleParam as string) ?? item?.title ?? "Now Playing";
+  const initialMs = startMs ? parseInt(startMs as string, 10) : 0;
 
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [playing, setPlaying] = useState(true);
-  const [positionMs, setPositionMs] = useState(0);
+  const [positionMs, setPositionMs] = useState(initialMs);
   const [durationMs, setDurationMs] = useState(0);
   const [buffering, setBuffering] = useState(false);
-  const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined);
+  const [seekTarget, setSeekTarget] = useState<number | undefined>(
+    initialMs > 0 ? initialMs : undefined
+  );
+  const [error, setError] = useState<string | null>(null);
 
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playerRef = useRef<any>(null);
@@ -53,6 +58,15 @@ export default function PlayerScreen() {
   useEffect(() => {
     showOverlay();
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
+  }, []);
+
+  // Back handler
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.back();
+      return true;
+    });
+    return () => sub.remove();
   }, []);
 
   useTVRemote(useCallback((evt) => {
@@ -73,18 +87,29 @@ export default function PlayerScreen() {
     showOverlay();
   }, [positionMs, durationMs, showOverlay]);
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const handleSeekAbsolute = useCallback((ms: number) => {
+    setSeekTarget(ms);
+    setPositionMs(ms);
+    showOverlay();
+  }, [showOverlay]);
+
+  const topPad = Platform.OS === "web" ? 0 : insets.top;
 
   return (
-    <Pressable style={styles.root} onPress={showOverlay} isTVSelectable hasTVPreferredFocus={!overlayVisible}>
-      {/* Video surface */}
+    <Pressable
+      style={styles.root}
+      onPress={showOverlay}
+      isTVSelectable
+      hasTVPreferredFocus={!overlayVisible}
+    >
       {VLCPlayer && streamUrl ? (
         <VLCPlayer
           ref={playerRef}
           source={{
             uri: streamUrl,
             hwDecoderEnabled: 1,
-            networkCachingMs: 1000,
+            hwDecoderForced: 0,
+            networkCachingMs: 1500,
           }}
           style={StyleSheet.absoluteFillObject}
           paused={!playing}
@@ -95,33 +120,29 @@ export default function PlayerScreen() {
             if (duration > 0) setDurationMs(duration);
           }}
           onBuffering={({ bufferRate }: { bufferRate: number }) => setBuffering(bufferRate < 100)}
-          onPlaying={() => setBuffering(false)}
+          onPlaying={() => { setBuffering(false); setError(null); }}
           onPaused={() => setBuffering(false)}
           onEnd={() => router.back()}
-          onError={() => setBuffering(false)}
+          onError={(e: any) => {
+            setBuffering(false);
+            setError("Playback error — check source URL");
+          }}
         />
       ) : (
         <View style={styles.videoSurface} />
       )}
 
-      {/* Buffering spinner — shown outside overlay so visible when overlay is hidden */}
-      {buffering && (
-        <View style={styles.bufferWrap} pointerEvents="none">
+      {buffering && !error && (
+        <View style={styles.center} pointerEvents="none">
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
 
-      <Pressable
-        style={[styles.backBtn, { top: topPad + 8 }]}
-        onPress={() => router.back()}
-        isTVSelectable
-      >
-        <Feather
-          name="arrow-left"
-          size={20}
-          color={overlayVisible ? colors.foreground : "transparent"}
-        />
-      </Pressable>
+      {error && (
+        <View style={styles.center} pointerEvents="none">
+          <Feather name="alert-circle" size={36} color={colors.primary} />
+        </View>
+      )}
 
       <PlayerOverlay
         title={mediaTitle}
@@ -130,7 +151,9 @@ export default function PlayerScreen() {
         position={streamUrl ? positionMs : undefined}
         duration={streamUrl ? durationMs : undefined}
         onSeek={streamUrl ? handleSeek : undefined}
+        onSeekAbsolute={streamUrl ? handleSeekAbsolute : undefined}
         buffering={buffering}
+        error={error}
         onTogglePlay={() => { setPlaying((p) => !p); showOverlay(); }}
         onClose={() => setOverlayVisible(false)}
       />
@@ -139,28 +162,7 @@ export default function PlayerScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-  videoSurface: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#000",
-  },
-  bufferWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backBtn: {
-    position: "absolute",
-    left: 16,
-    zIndex: 20,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  root: { flex: 1, backgroundColor: "#000" },
+  videoSurface: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000" },
+  center: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
 });
